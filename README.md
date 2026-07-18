@@ -84,22 +84,30 @@ aws_secret_access_key = ...
 
 ### 4. Prepare the Codex Kit
 
-`kit/files/home/.codex/AGENTS.md` is ignored by Git and does not exist in a fresh clone. Create it from a snapshot of the host's global Codex instructions before creating the sandbox:
+The kit carries two pieces of personal configuration into the sandbox:
+
+- The host's global Codex instructions.
+- The name and email from the host's global Git configuration.
+
+Prepare both files and validate the kit:
 
 ```bash
 cp "$USER_DIR/.codex/AGENTS.md" kit/files/home/.codex/AGENTS.md
+test -n "$(git config --global user.name)"
+test -n "$(git config --global user.email)"
+git config --file kit/files/home/.gitconfig user.name "$(git config --global user.name)"
+git config --file kit/files/home/.gitconfig user.email "$(git config --global user.email)"
 sbx kit validate ./kit
 ```
 
-The file is copied through these locations:
+| Configuration | Host Source | Prepared Kit File | Sandbox Destination |
+| --- | --- | --- | --- |
+| Codex instructions | `$USER_DIR/.codex/AGENTS.md` | `kit/files/home/.codex/AGENTS.md` | `/home/agent/.codex/AGENTS.md` |
+| Git identity | Global `user.name` and `user.email` | `kit/files/home/.gitconfig` | `/home/agent/.gitconfig` |
 
-```text
-Host:    $USER_DIR/.codex/AGENTS.md
-Kit:     kit/files/home/.codex/AGENTS.md
-Sandbox: /home/agent/.codex/AGENTS.md
-```
+The prepared files contain personal configuration and are intentionally ignored by Git. Neither exists in a fresh clone, and preparing the kit does not make them eligible for a commit.
 
-This is a snapshot, not a live link. Changes to the host file do not update the kit, and changes to the kit do not update an existing sandbox. Repeat the copy and recreate the sandbox to apply new global instructions.
+These files are snapshots, not live links. Changes on the host do not update the kit, and preparing the kit again does not update an existing sandbox. Repeat these commands and recreate the sandbox to apply changes.
 
 ### 5. Configure Docker Sandboxes
 

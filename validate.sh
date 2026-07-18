@@ -10,6 +10,9 @@ set -euo pipefail
 
 test "$(id -un)" = agent
 test -f "$HOME/.codex/AGENTS.md"
+test -f "$HOME/.gitconfig"
+test -n "$(git config --global user.name)"
+test -n "$(git config --global user.email)"
 
 command -v brew
 command -v bwrap
