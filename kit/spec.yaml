@@ -1,0 +1,5 @@
+schemaVersion: "1"
+kind: mixin
+name: personal-codex-config
+displayName: Personal Codex configuration
+description: Installs a prepared snapshot of the user's global Codex instructions in the sandbox agent's home directory
