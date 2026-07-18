@@ -1,7 +1,5 @@
 # Agent Sandbox
 
-## Why This Exists
-
 This repository is an attempt to make it safer to run Codex autonomously in “YOLO mode” by placing the agent inside a [customized Docker Sandbox](https://docs.docker.com/ai/sandboxes/customize/) and limiting the host state exposed to it.
 
 It also provides a reproducible working environment. When a new project needs another dependency or tool, that requirement can be added here and included in the next sandbox build.
