@@ -31,6 +31,10 @@ The template currently includes:
 - The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
 - Removing and recreating the sandbox deletes its VM-local files, configuration, command history, and Codex conversation history. Mounted project files remain on the host.
 
+## Future Work
+
+- Support verified Git commits with GPG signing from inside the sandbox.
+
 ## Setup
 
 ### 1. Install the Prerequisites
