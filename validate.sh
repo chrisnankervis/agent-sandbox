@@ -31,6 +31,12 @@ bwrap --version
 gcc --version | head -n 1
 aws --version
 test -n "$USER_DIR"
+test "${GIT_ASKPASS:-}" = /bin/false
+test "${SSH_ASKPASS:-}" = /bin/false
+test "${GIT_SSH_COMMAND:-}" = "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+git config --system --get-all url.ssh://git@github.com/.insteadOf | grep -Fx https://github.com/
+git config --system --get-all url.ssh://git@github.com/.insteadOf | grep -Fx http://github.com/
+git config --system --get-all url.ssh://git@github.com/.insteadOf | grep -Fx git://github.com/
 test "$AWS_CONFIG_FILE" = "$USER_DIR/.aws-sandbox/config"
 test "$AWS_SHARED_CREDENTIALS_FILE" = "$USER_DIR/.aws-sandbox/credentials"
 test "$AWS_PROFILE" = sandbox

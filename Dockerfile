@@ -20,7 +20,8 @@ RUN sed -i \
       bubblewrap \
       ca-certificates \
       curl \
-      git; \
+      git \
+      openssh-client; \
     rm -rf /var/lib/apt/lists/*
 
 USER agent
@@ -51,6 +52,14 @@ RUN test -n "$USER_DIR"
 ENV USER_DIR="$USER_DIR"
 
 USER root
+
+RUN git config --system --add url."ssh://git@github.com/".insteadOf https://github.com/; \
+    git config --system --add url."ssh://git@github.com/".insteadOf http://github.com/; \
+    git config --system --add url."ssh://git@github.com/".insteadOf git://github.com/
+
+ENV GIT_ASKPASS=/bin/false
+ENV SSH_ASKPASS=/bin/false
+ENV GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
 
 RUN cat >> /etc/sandbox-persistent.sh <<'EOF'
 if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then

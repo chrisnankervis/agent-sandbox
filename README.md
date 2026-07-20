@@ -16,6 +16,7 @@ The template currently includes:
 
 - Homebrew
 - `build-essential` and Bubblewrap
+- `openssh-client`
 - AWS CLI
 - Go
 - Hugo
@@ -27,6 +28,7 @@ The template currently includes:
 - `PROJECT_DIR` is mounted read-write. Codex can read, modify, and delete files within that directory.
 - `$USER_DIR/.aws-sandbox` is mounted read-only, so Codex can read its AWS credentials but cannot modify the host files. Users are expected to create separate, least-privilege credentials for the sandbox and store them as the directory's only profile, named `sandbox`; do not reuse or expose the host's complete `~/.aws` directory.
 - Git operations use the host's forwarded SSH agent when `SSH_AUTH_SOCK` is available. Private SSH keys remain on the host.
+  - `openssh-client` is installed and GitHub HTTPS, HTTP, and Git protocol remotes are rewritten to SSH in the sandbox's system Git config. This bypasses HTTPS credential prompts from tools such as Homebrew, NVM, and Codex plugin sync while still keeping credentials in the forwarded host agent.
 - A GitHub personal access token is optional. It is only needed for tools such as `gh` that access the GitHub API; `gh` is not currently bundled with this template.
 - The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
 - Removing and recreating the sandbox deletes its VM-local files, configuration, command history, and Codex conversation history. Mounted project files remain on the host.
