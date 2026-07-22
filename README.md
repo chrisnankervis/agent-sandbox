@@ -1,43 +1,39 @@
 # Agent Sandbox
 
-This repository is an attempt to make it safer to run Codex autonomously in “YOLO mode” by placing the agent inside a [customized Docker Sandbox](https://docs.docker.com/ai/sandboxes/customize/) and limiting the host state exposed to it.
-
-It also provides a reproducible working environment. When a new project needs another dependency or tool, that requirement can be added here and included in the next sandbox build.
+This repository builds a reusable [Docker Sandbox](https://docs.docker.com/ai/sandboxes/customize/) for running Codex with more autonomy without giving it the same administrative scope as the host user. It puts the agent behind Docker Sandbox's microVM isolation, mounts only the intended workspace and credentials, and still provides the tools needed for real development work. The goal is to give Codex enough freedom to be useful but with a tighter boundary around the files, credentials, and host state it can reach.
 
 ## How It Works
 
-This repository combines a [Docker Sandbox template](https://docs.docker.com/ai/sandboxes/customize/templates/) with a thin [mixin kit](https://docs.docker.com/ai/sandboxes/customize/kits/):
+This repository combines a [Template](https://docs.docker.com/ai/sandboxes/customize/templates/) with a thin [Kit](https://docs.docker.com/ai/sandboxes/customize/kits/):
 
-- `Dockerfile` extends `docker/sandbox-templates:codex-docker` and is built into the custom template image. It installs the durable tools and runtimes used across projects, so Docker can cache the heavier environment layers and new sandboxes start from a known baseline.
-- `kit/` uses the [Docker Sandbox kit specification](https://docs.docker.com/ai/sandboxes/customize/kit-reference/) for creation-time customization, such as injecting a snapshot of the host's global Codex instructions into `/home/agent/.codex/AGENTS.md`.
+- `Dockerfile` extends the [Codex base image](https://docs.docker.com/ai/sandboxes/agents/codex/#base-image) and installs the durable tools and runtimes used across projects, so Docker can cache the heavier environment layers and new sandboxes start from a known baseline.
+- `kit/` uses the [kit specification](https://docs.docker.com/ai/sandboxes/customize/kit-reference/) for creation-time customization, such as injecting a snapshot of the host's global Codex instructions into `/home/agent/.codex/AGENTS.md`.
 - `validate.sh` checks that the expected tools and configuration are present in the created sandbox.
 
-The split is intentional: the template carries the stable base environment, while the kit carries lighter personal or sandbox-specific configuration that should be applied when the sandbox is created.
+The template carries the stable base environment, while the kit carries lighter personal or sandbox-specific configuration that should be applied when the sandbox is created.
 
-The template currently includes:
+### What's Included
 
-- Homebrew
-- `build-essential` and Bubblewrap
-- `openssh-client`
-- AWS CLI
-- Go
-- Hugo
-- NVM and the current Node.js LTS release
-- The Codex agent and private Docker Engine inherited from the Docker template
+| Group | Tools | Notes |
+| --- | --- | --- |
+| Package Managers | `homebrew`, `build-essential`, `bubblewrap` | `build-essential` and `bubblewrap` are Homebrew's recommended Linux dependencies. |
+| Runtimes | `nvm`, `node` | Node.js is installed as the current LTS release via NVM. |
+| Development Tools | `openssh-client` | Provides the SSH transport Git needs to use Docker Sandbox's forwarded SSH agent. |
+| Development Tools | `awscli` | Installed via Homebrew for AWS access from the sandbox. |
+| Development Tools | `go` | Installed via Homebrew for Go development. |
+| Development Tools | `hugo` | Installed via Homebrew for static site work. |
 
 ## Security Considerations
 
 - `PROJECT_DIR` is mounted read-write. Codex can read, modify, and delete files within that directory.
-- `$USER_DIR/.aws-sandbox` is mounted read-only, so Codex can read its AWS credentials but cannot modify the host files. Users are expected to create separate, least-privilege credentials for the sandbox and store them as the directory's only profile, named `sandbox`; do not reuse or expose the host's complete `~/.aws` directory.
+- The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
 - Git operations use the host's forwarded SSH agent when `SSH_AUTH_SOCK` is available. Private SSH keys remain on the host.
   - `openssh-client` is installed and GitHub HTTPS, HTTP, and Git protocol remotes are rewritten to SSH in the sandbox's system Git config. This bypasses HTTPS credential prompts from tools such as Homebrew, NVM, and Codex plugin sync while still keeping credentials in the forwarded host agent.
-- A GitHub personal access token is optional. It is only needed for tools such as `gh` that access the GitHub API; `gh` is not currently bundled with this template.
-- The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
+  - A GitHub personal access token is optional. It is only needed for tools such as `gh` that access the GitHub API; `gh` is not currently bundled with this template.
+- `$USER_DIR/.aws-sandbox` is mounted read-only, so Codex can read its AWS credentials but cannot modify the host files.
+  - Users are expected to create separate, least-privilege credentials for the sandbox and store them as the directory's only profile, named `sandbox`
+  - Do not reuse or expose the host's complete `~/.aws` directory.
 - Removing and recreating the sandbox deletes its VM-local files, configuration, command history, and Codex conversation history. Mounted project files remain on the host.
-
-## Future Work
-
-- Support verified Git commits with GPG signing from inside the sandbox.
 
 ## Setup
 
@@ -49,7 +45,23 @@ The template currently includes:
 
 Run the remaining commands from the root of this repository.
 
-### 2. Set the Host Paths
+### 2. Configure Docker Sandboxes
+
+Enable clipboard image pasting:
+
+```bash
+sbx settings set clipboard.imagePaste true
+```
+
+If Git is configured through SSH on the host, no GitHub secret is required for normal Git operations. Docker Sandboxes forwards the host SSH agent when `SSH_AUTH_SOCK` is set.
+
+To use `gh` or other GitHub API clients, optionally register the token already managed by the host GitHub CLI:
+
+```bash
+gh auth token | sbx secret set -g github
+```
+
+### 3. Set the Host Paths
 
 Set these variables in the shell used to prepare, build, create, and validate the sandbox:
 
@@ -60,7 +72,7 @@ export PROJECT_DIR="$HOME/Code"
 
 `USER_DIR` contains the host's `.codex` and `.aws-sandbox` directories. `PROJECT_DIR` is the workspace exposed to Codex. Re-export both variables when continuing from a new shell.
 
-### 3. Prepare the AWS Profile
+### 4. Prepare the AWS Profile
 
 AWS is not an `sbx secret` service. AWS authentication can require an access key ID, secret access key, and session token rather than a single bearer token.
 
@@ -88,7 +100,7 @@ aws_access_key_id = ...
 aws_secret_access_key = ...
 ```
 
-### 4. Prepare the Codex Kit
+### 5. Prepare the Codex Kit
 
 The kit carries two pieces of personal configuration into the sandbox:
 
@@ -114,28 +126,6 @@ sbx kit validate ./kit
 The prepared files contain personal configuration and are intentionally ignored by Git. Neither exists in a fresh clone, and preparing the kit does not make them eligible for a commit.
 
 These files are snapshots, not live links. Changes on the host do not update the kit, and preparing the kit again does not update an existing sandbox. Repeat these commands and recreate the sandbox to apply changes.
-
-### 5. Configure Docker Sandboxes
-
-Enable clipboard image pasting:
-
-```bash
-sbx settings set clipboard.imagePaste true
-```
-
-If Git is configured through SSH on the host, no GitHub secret is required for normal Git operations. Docker Sandboxes forwards the host SSH agent when `SSH_AUTH_SOCK` is set.
-
-To use `gh` or other GitHub API clients, optionally register the token already managed by the host GitHub CLI:
-
-```bash
-gh auth token | sbx secret set -g github
-```
-
-Global secrets apply to newly created sandboxes. To add the token to an existing sandbox instead, use:
-
-```bash
-gh auth token | sbx secret set agent-sandbox github
-```
 
 ### 6. Build and Load the Template
 
@@ -164,6 +154,9 @@ rm /tmp/agent-sandbox-template.tar
 
 ### 7. Create the Sandbox
 
+> [!WARNING]
+> Replacing an existing sandbox deletes its Codex conversation history and anything created outside of `$PROJECT_DIR`. Finish or record anything needed from existing conversations before removing it.
+
 ```bash
 sbx create \
   --name agent-sandbox \
@@ -176,9 +169,6 @@ sbx create \
 
 The AWS mount is read-only and the template selects the `sandbox` profile through `AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE`, and `AWS_PROFILE`.
 
-> [!WARNING]
-> Replacing an existing sandbox deletes its Codex conversation history. Finish or record anything needed from existing conversations before removing it.
-
 ### 8. Validate the Sandbox
 
 ```bash
@@ -190,3 +180,7 @@ The AWS mount is read-only and the template selects the `sandbox` profile throug
 ```bash
 sbx run --name agent-sandbox
 ```
+
+## Roadmap
+
+- Support verified Git commits with GPG signing from inside the sandbox.
