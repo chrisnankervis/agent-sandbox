@@ -8,9 +8,11 @@ It also provides a reproducible working environment. When a new project needs an
 
 This repository combines a [Docker Sandbox template](https://docs.docker.com/ai/sandboxes/customize/templates/) with a thin [mixin kit](https://docs.docker.com/ai/sandboxes/customize/kits/):
 
-- `Dockerfile` extends `docker/sandbox-templates:codex-docker` and installs the durable tools and runtimes used across projects.
-- `kit/` uses the [Docker Sandbox kit specification](https://docs.docker.com/ai/sandboxes/customize/kit-reference/) to inject a creation-time snapshot of the host's global Codex instructions into `/home/agent/.codex/AGENTS.md`.
+- `Dockerfile` extends `docker/sandbox-templates:codex-docker` and is built into the custom template image. It installs the durable tools and runtimes used across projects, so Docker can cache the heavier environment layers and new sandboxes start from a known baseline.
+- `kit/` uses the [Docker Sandbox kit specification](https://docs.docker.com/ai/sandboxes/customize/kit-reference/) for creation-time customization, such as injecting a snapshot of the host's global Codex instructions into `/home/agent/.codex/AGENTS.md`.
 - `validate.sh` checks that the expected tools and configuration are present in the created sandbox.
+
+The split is intentional: the template carries the stable base environment, while the kit carries lighter personal or sandbox-specific configuration that should be applied when the sandbox is created.
 
 The template currently includes:
 
