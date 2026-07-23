@@ -53,6 +53,11 @@ Enable clipboard image pasting:
 sbx settings set clipboard.imagePaste true
 ```
 
+> [!WARNING]
+> Docker documents this as enabling Codex image paste, but the current base image
+> runs Codex 0.142.4 and may still fail with an X11 clipboard timeout. Wait for
+> upstream Codex support before relying on it.
+
 If Git is configured through SSH on the host, no GitHub secret is required for normal Git operations. Docker Sandboxes forwards the host SSH agent when `SSH_AUTH_SOCK` is set.
 
 To use `gh` or other GitHub API clients, optionally register the token already managed by the host GitHub CLI:
