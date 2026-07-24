@@ -159,9 +159,9 @@ sbx kit validate ./kit
 
 | Configuration | Host Source | Prepared Kit File | Sandbox Destination |
 | --- | --- | --- | --- |
-| Codex instructions | `$USER_DIR/.codex/AGENTS.md` | `kit/files/home/.codex/AGENTS.md` | `/home/agent/.codex/AGENTS.md` |
-| Git identity and signing | Global Git config plus `$USER_DIR/.ssh/id_ed25519_signing.pub` | `kit/files/home/.gitconfig` | `/home/agent/.gitconfig` |
-| SSH signature verification | `$USER_DIR/.ssh/id_ed25519_signing.pub` | `kit/files/home/.ssh/allowed_signers` | `/home/agent/.ssh/allowed_signers` |
+| Codex Instructions | `$USER_DIR/.codex/AGENTS.md` | `kit/files/home/.codex/AGENTS.md` | `/home/agent/.codex/AGENTS.md` |
+| Git Identity | Global `user.name` and `user.email` | `kit/files/home/.gitconfig` | `/home/agent/.gitconfig` |
+| SSH Signing | `$USER_DIR/.ssh/id_ed25519_signing.pub` | `kit/files/home/.gitconfig` and `kit/files/home/.ssh/allowed_signers` | `/home/agent/.gitconfig` and `/home/agent/.ssh/allowed_signers` |
 
 The prepared files contain personal configuration and are intentionally ignored by Git. Neither exists in a fresh clone, and preparing the kit does not make them eligible for a commit.
 
