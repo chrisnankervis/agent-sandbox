@@ -62,6 +62,8 @@ node --version
 npm --version
 codex --version
 
+# The signed commit is created in a throwaway repo under /tmp and removed when
+# this validation shell exits, so validation never mutates the mounted project.
 tmpdir="$(mktemp -d)"
 trap '\''rm -rf "$tmpdir"'\'' EXIT
 git -C "$tmpdir" init -q
