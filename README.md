@@ -29,7 +29,7 @@ The template carries the stable base environment, while the kit carries lighter 
 - The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
 - Git operations and commit signing use the host's forwarded SSH agent when `SSH_AUTH_SOCK` is available. Private SSH keys remain on the host.
   - Commits are signed with a dedicated SSH signing key configured in Git. The sandbox receives the public key in Git config and an `allowed_signers` file for local verification, but the private signing key remains in the host SSH agent.
-  - `openssh-client` is installed and GitHub HTTPS, HTTP, and Git protocol remotes are rewritten to SSH in the sandbox's system Git config. This bypasses HTTPS credential prompts from tools such as Homebrew, NVM, and Codex plugin sync while still keeping credentials in the forwarded host agent.
+  - `openssh-client` is installed and GitHub HTTPS, HTTP, and Git protocol remotes are rewritten to SSH in the sandbox's system Git config. This prevents HTTPS credential prompts from tools such as Homebrew, NVM, and Codex plugin sync from appearing inside the Codex conversation window, stealing focus, and making keyboard input unreliable, while still keeping credentials in the forwarded host agent.
   - A GitHub personal access token is optional. It is only needed for tools such as `gh` that access the GitHub API; `gh` is not currently bundled with this template.
 - `$USER_DIR/.aws-sandbox` is mounted read-only, so Codex can read its AWS credentials but cannot modify the host files.
   - Users are expected to create separate, least-privilege credentials for the sandbox and store them as the directory's only profile, named `sandbox`
