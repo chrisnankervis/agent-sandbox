@@ -18,7 +18,7 @@ The template carries the stable base environment, while the kit carries lighter 
 | --- | --- | --- |
 | Package Managers | `homebrew`, `build-essential`, `bubblewrap` | `build-essential` and `bubblewrap` are Homebrew's recommended Linux dependencies. |
 | Runtimes | `nvm`, `node` | Node.js is installed as the current LTS release via NVM. |
-| Development Tools | `openssh-client` | Provides the SSH transport Git needs to use Docker Sandbox's forwarded SSH agent. |
+| Development Tools | `openssh-client` | Provides the SSH transport and signing support Git needs to use Docker Sandbox's forwarded SSH agent. |
 | Development Tools | `awscli` | Installed via Homebrew for AWS access from the sandbox. |
 | Development Tools | `go` | Installed via Homebrew for Go development. |
 | Development Tools | `hugo` | Installed via Homebrew for static site work. |
@@ -27,7 +27,8 @@ The template carries the stable base environment, while the kit carries lighter 
 
 - `PROJECT_DIR` is mounted read-write. Codex can read, modify, and delete files within that directory.
 - The host path supplied as `USER_DIR` is stored in the locally built image's metadata. Do not publish the image if that path is considered sensitive.
-- Git operations use the host's forwarded SSH agent when `SSH_AUTH_SOCK` is available. Private SSH keys remain on the host.
+- Git operations and commit signing use the host's forwarded SSH agent when `SSH_AUTH_SOCK` is available. Private SSH keys remain on the host.
+  - Commits are signed with a dedicated SSH signing key configured in Git. The sandbox receives the public key in Git config and an `allowed_signers` file for local verification, but the private signing key remains in the host SSH agent.
   - `openssh-client` is installed and GitHub HTTPS, HTTP, and Git protocol remotes are rewritten to SSH in the sandbox's system Git config. This bypasses HTTPS credential prompts from tools such as Homebrew, NVM, and Codex plugin sync while still keeping credentials in the forwarded host agent.
   - A GitHub personal access token is optional. It is only needed for tools such as `gh` that access the GitHub API; `gh` is not currently bundled with this template.
 - `$USER_DIR/.aws-sandbox` is mounted read-only, so Codex can read its AWS credentials but cannot modify the host files.
@@ -105,34 +106,68 @@ aws_access_key_id = ...
 aws_secret_access_key = ...
 ```
 
-### 5. Prepare the Codex Kit
+### 5. Prepare SSH Commit Signing
 
-The kit carries two pieces of personal configuration into the sandbox:
+Create a dedicated SSH key for commit signing if one does not already exist:
+
+```bash
+ssh-keygen -t ed25519 -C "$(git config --global user.email) signing" -f "$USER_DIR/.ssh/id_ed25519_signing"
+ssh-add "$USER_DIR/.ssh/id_ed25519_signing"
+```
+
+Register the public key with GitHub as an SSH signing key:
+
+```bash
+cat "$USER_DIR/.ssh/id_ed25519_signing.pub"
+```
+
+In GitHub, add it under Settings → SSH and GPG Keys → New SSH Key, with the key type set to Signing Key.
+
+If the key already exists, make sure it is loaded in the host SSH agent:
+
+```bash
+ssh-add "$USER_DIR/.ssh/id_ed25519_signing"
+```
+
+### 6. Prepare the Codex Kit
+
+The kit carries three pieces of personal configuration into the sandbox:
 
 - The host's global Codex instructions.
-- The name and email from the host's global Git configuration.
+- The name, email, and SSH signing settings from the host's global Git configuration.
+- The public SSH signing key in an `allowed_signers` file so Git can verify SSH signatures locally.
 
-Prepare both files and validate the kit:
+Prepare the files and validate the kit:
 
 ```bash
 cp "$USER_DIR/.codex/AGENTS.md" kit/files/home/.codex/AGENTS.md
 test -n "$(git config --global user.name)"
 test -n "$(git config --global user.email)"
+SIGNING_KEY="$(cat "$USER_DIR/.ssh/id_ed25519_signing.pub")"
+test -n "$SIGNING_KEY"
 git config --file kit/files/home/.gitconfig user.name "$(git config --global user.name)"
 git config --file kit/files/home/.gitconfig user.email "$(git config --global user.email)"
+git config --file kit/files/home/.gitconfig gpg.format ssh
+git config --file kit/files/home/.gitconfig user.signingkey "key::$SIGNING_KEY"
+git config --file kit/files/home/.gitconfig commit.gpgsign true
+git config --file kit/files/home/.gitconfig tag.gpgsign true
+git config --file kit/files/home/.gitconfig gpg.ssh.allowedSignersFile /home/agent/.ssh/allowed_signers
+mkdir -p kit/files/home/.ssh
+printf "%s %s\n" "$(git config --global user.email)" "$SIGNING_KEY" > kit/files/home/.ssh/allowed_signers
 sbx kit validate ./kit
 ```
 
 | Configuration | Host Source | Prepared Kit File | Sandbox Destination |
 | --- | --- | --- | --- |
 | Codex instructions | `$USER_DIR/.codex/AGENTS.md` | `kit/files/home/.codex/AGENTS.md` | `/home/agent/.codex/AGENTS.md` |
-| Git identity | Global `user.name` and `user.email` | `kit/files/home/.gitconfig` | `/home/agent/.gitconfig` |
+| Git identity and signing | Global Git config plus `$USER_DIR/.ssh/id_ed25519_signing.pub` | `kit/files/home/.gitconfig` | `/home/agent/.gitconfig` |
+| SSH signature verification | `$USER_DIR/.ssh/id_ed25519_signing.pub` | `kit/files/home/.ssh/allowed_signers` | `/home/agent/.ssh/allowed_signers` |
 
 The prepared files contain personal configuration and are intentionally ignored by Git. Neither exists in a fresh clone, and preparing the kit does not make them eligible for a commit.
 
 These files are snapshots, not live links. Changes on the host do not update the kit, and preparing the kit again does not update an existing sandbox. Repeat these commands and recreate the sandbox to apply changes.
 
-### 6. Build and Load the Template
+### 7. Build and Load the Template
 
 Build the Codex-derived image with Docker Desktop:
 
@@ -157,7 +192,7 @@ Delete the transfer archive after it loads successfully:
 rm /tmp/agent-sandbox-template.tar
 ```
 
-### 7. Create the Sandbox
+### 8. Create the Sandbox
 
 > [!WARNING]
 > Replacing an existing sandbox deletes its Codex conversation history and anything created outside of `$PROJECT_DIR`. Finish or record anything needed from existing conversations before removing it.
@@ -174,18 +209,14 @@ sbx create \
 
 The AWS mount is read-only and the template selects the `sandbox` profile through `AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE`, and `AWS_PROFILE`.
 
-### 8. Validate the Sandbox
+### 9. Validate the Sandbox
 
 ```bash
 ./validate.sh agent-sandbox
 ```
 
-### 9. Run Codex
+### 10. Run Codex
 
 ```bash
 sbx run --name agent-sandbox
 ```
-
-## Roadmap
-
-- Support verified Git commits with GPG signing from inside the sandbox.
